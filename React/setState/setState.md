@@ -9,17 +9,17 @@
 直接赋值状态值变了，但是不会触发组件重新渲染会导致界面展示的状态值与实际状态值不匹配。
 
 ## setState()的用法
-书写方式1：this.setstate({},()=>{}) 
-书写方式2：this.setstate(()=({}),()=>{})    可以获取到数据更新后的最新值
-参数1
-1.对象
-2.函数
-3.null
-4.空
+书写方式1：this.setstate({},()=>{})<br/>
+书写方式2：this.setstate(()=({}),()=>{})    可以获取到数据更新后的最新值<br/>
+参数1<br/>
+1.对象<br/>
+2.函数<br/>
+3.null<br/>
+4.空<br/>
 3和4会更新状态值但是不会render
 
 ## setState合并
-当setState() 传对象类型参数，React会合并重复多次的调用setState()，触发一次render；
+当setState() 传对象类型参数，React会合并重复多次的调用setState()，触发一次render；<br/>
 当setState() 传函数类型参数，React会依次多次的调用setState()，触发一次render。
 实例1：
 ```
@@ -47,7 +47,7 @@ this.setState((state, props) => ({
 ```
 
 ## setState是同步的还是异步的？
-类组件（class-component）的更新机制--legacy模式
+类组件（class-component）的更新机制--legacy模式<br/>
 在setTimeout或者原生dom事件中，setState是同步
 示例2：
 ```
@@ -90,7 +90,7 @@ onClick() {
 
 
 
-函数式组件（function-component）的更新机制--concurrent模式
+函数式组件（function-component）的更新机制--concurrent模式<br/>
 实例4：
 
 ```
@@ -110,65 +110,67 @@ onClick() {
 ```
 
 原因：
-1，调用 setCount 时，会做合并处理，异步更新该函数式组件对应的 hooks 链表里面的值，然后触发重渲染(re-renders)，与类组件一致；
-2，函数式的capture-value特性决定了console.log(count)语句打印的始终是一个只存在于当前帧的常量，所以就算无论 setCount 是不是同步的都会打印出旧值。
+1，调用 setCount 时，会做合并处理，异步更新该函数式组件对应的 hooks 链表里面的值，然后触发重渲染(re-renders)，与类组件一致；<br/>
+2，函数式的capture-value特性决定了console.log(count)语句打印的始终是一个只存在于当前帧的常量，所以就算无论 setCount 是不是同步的都会打印出旧值。<br/>
 capture-value特性: 每次 Render 的内容都会形成一个快照并保留下来，因此当状态变更而 Rerender 时，就形成了 N 个 Render 状态，而每个 Render 状态都拥有自己固定不变的 Props 与 State。
 
 ![同步异步分析图](./stickPicture.png)
 
-# setState()执行过程
-1.调用this.setState(newState)；
-2.newState会存入 pending 队列；
+## setState()执行过程
+1.调用this.setState(newState)；<br/>
+2.newState会存入 pending 队列；<br/>
      判断是不是batchUpdate；如果是batchUpdate，则将组件先保存在所谓的脏组件dirtyComponents中；如果不是batchUpdate，那么就遍历所有的脏组件，并更新它们。
 
+![同步异步分析图](./setProcess.png)
 
 
-# setState源码解析(React 15.6.2)
-1.enqueueSetState
-  将传入的状态值放入数组队列里
-  执行enqueueUpdate来更新当前组件的实例
+## setState源码解析(React 15.6.2)
+### 1.enqueueSetState
+  将传入的状态值放入数组队列里<br/>
+  执行enqueueUpdate来更新当前组件的实例<br/>
+![同步异步分析图](./setState1.png)
 
-enqueueSetState
+### 2.enqueueUpdate
+ensureInjected方法检查当前运行的代码是否处在一个事务（reconcile transaction）中，不是则抛出错误<br/>
+判断是否处于创建或更新组件阶段：<br/>
+不是则处理更新事务<br/>
+是则将推入dirtyComponents数组等待更新。<br/>
+![同步异步分析图](./setState2.png)
 
-2.enqueueUpdate
-ensureInjected方法检查当前运行的代码是否处在一个事务（reconcile transaction）中，不是则抛出错误
-判断是否处于创建或更新组件阶段：
-不是则处理更新事务
-是则将推入dirtyComponents数组等待更新。
+### 3.batchedUpdates
+最开始先把更新标志isBatchingUpdates改为true，<br/>
+调用transaction.perform(enqueueUpdate)以事务的方式处理updates。<br/>
+![同步异步分析图](./setState3.png)
+### 4.transaction
+来源于面向切面编程，不改变原有方法的基础上，在执行方法的前后进行额外的操作。<br/>
+wapper1:<br/>
+FLUSH_BATCHED_UPDATES: 负责执行flushBatchedUpdates更新组件；<br/>
+wapper2:<br/>
+RESET_BATCHED_UPDATES: 负责在close阶段把isBatchingUpdates设置为false。<br/>
+![同步异步分析图](./setState4.png)
 
-enquueUpdate
-3.batchedUpdates
-最开始先把更新标志isBatchingUpdates改为true，
-调用transaction.perform(enqueueUpdate)以事务的方式处理updates。
-
-batchedUpdates
-3.transaction
-来源于面向切面编程，不改变原有方法的基础上，在执行方法的前后进行额外的操作。
-wapper1:
-FLUSH_BATCHED_UPDATES: 负责执行flushBatchedUpdates更新组件；
-wapper2:
-RESET_BATCHED_UPDATES: 负责在close阶段把isBatchingUpdates设置为false。
-
-
-4.flushBatchedUpdates
-1.Virtual DOM到真实DOM的映射
+### 5.flushBatchedUpdates
+1.Virtual DOM到真实DOM的映射<br/>
 2.清空dirtyComponents(一个调用栈作为一个结算节点)并执行runBatchedUpdate方法
+![同步异步分析图](./setState5.png)
 
- 5.runBatchedUpdate
-1.先将dirtyComponents排序便于更新是子组件比父组件先更新；
-2.循环调用updateComponent更新组件并执行callback。
+### 6.runBatchedUpdate
+1.先将dirtyComponents排序便于更新是子组件比父组件先更新；<br/>
+2.循环调用updateComponent更新组件并执行callback。<br/>
+![同步异步分析图](./setState6.png)
 
-6.updateComponent
-1.计算新的state，更新组件，执行React组件存在期的生命周期方法，完成声明周期的整套流程。
+### 7.updateComponent
+1.计算新的state，更新组件，执行React组件存在期的生命周期方法，完成声明周期的整套流程。<br/>
+![同步异步分析图](./setState7.png)
 
-
-7._processPendingState
-如果更新队列为null，那么返回原来的state；
-如果更新队列有一个更新值，那么返回更新值；
-如果更新队列有多个更新，那么通过for循环将它们合并。
-
+### 8._processPendingState
+如果更新队列为null，那么返回原来的state；<br/>
+如果更新队列有一个更新值，那么返回更新值；<br/>
+如果更新队列有多个更新，那么通过for循环将它们合并。<br/>
+![同步异步分析图](./setState8.png)
 
 
 总结 
-1. 每次更新组件前后都会执行shouldComponentUpdate,componentWillUpdate，render，componentDidUpdate，所有不能在其声明周期方法中setState(),会引起死循环；
-2. shouldComponentUpdate返回false，更新中断 不会执行componentWillUpdate，render，componentDidUpdate，但是state还是会更新；
+1. 每次更新组件前后都会执行shouldComponentUpdate,componentWillUpdate，render，componentDidUpdate，所有不能在其声明周期方法中setState(),会引起死循环；<br/>
+2. shouldComponentUpdate返回false，更新中断 不会执行componentWillUpdate，render，componentDidUpdate，但是state还是会更新。<br/>
+![同步异步分析图](./allProcess.png)
